@@ -19,6 +19,8 @@ static void consputc(int);
 
 static int panicked = 0;
 
+int back_counter = 0;
+
 static struct {
   struct spinlock lock;
   int locking;
@@ -48,7 +50,6 @@ printint(int xx, int base, int sign)
   while(--i >= 0)
     consputc(buf[i]);
 }
-//PAGEBREAK: 50
 
 // Print to the console. only understands %d, %x, %p, %s.
 void
@@ -123,7 +124,6 @@ panic(char *s)
     ;
 }
 
-//PAGEBREAK: 50
 #define BACKSPACE 0x100
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
@@ -142,9 +142,16 @@ cgaputc(int c)
   if(c == '\n')
     pos += 80 - pos%80;
   else if(c == BACKSPACE){
+    for(int i = pos - 1; i < pos + back_counter; i++){
+      crt[i] = crt[i + 1];
+    }
     if(pos > 0) --pos;
-  } else
+  } else {
+    for(int i = pos + back_counter; i > pos; i--){ 
+      crt[i] = crt[i - 1];
+    }
     crt[pos++] = (c&0xff) | 0x0700;  // black on white
+  }
 
   if(pos < 0 || pos > 25*80)
     panic("pos under/overflow");
@@ -159,7 +166,7 @@ cgaputc(int c)
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  crt[pos] = ' ' | 0x0700;
+  crt[pos + back_counter] = ' ' | 0x0700;
 }
 
 void
@@ -188,6 +195,36 @@ struct {
 
 #define C(x)  ((x)-'@')  // Control-x
 
+static int
+get_cursor_pos()
+{
+  int pos;
+  outb(CRTPORT, 14);                  
+  pos = inb(CRTPORT+1) << 8;
+  outb(CRTPORT, 15);
+  pos |= inb(CRTPORT+1);  
+
+  return pos;
+}
+
+static void
+reset_cursor_pos(int pos)
+{
+  outb(CRTPORT, 14);
+  outb(CRTPORT+1, pos>>8);
+  outb(CRTPORT, 15);
+  outb(CRTPORT+1, pos);
+}
+
+static void
+move_cursor_back()
+{
+  int pos = get_cursor_pos();
+  pos--;
+  back_counter++;
+  reset_cursor_pos(pos);
+}
+
 void
 consoleintr(int (*getc)(void))
 {
@@ -213,12 +250,16 @@ consoleintr(int (*getc)(void))
         consputc(BACKSPACE);
       }
       break;
+    case C('B') : 
+      move_cursor_back();
+      break;
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
         c = (c == '\r') ? '\n' : c;
         input.buf[input.e++ % INPUT_BUF] = c;
         consputc(c);
         if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
+          back_counter = 0;
           input.w = input.e;
           wakeup(&input.r);
         }
@@ -296,4 +337,3 @@ consoleinit(void)
 
   ioapicenable(IRQ_KBD, 0);
 }
-
