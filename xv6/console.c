@@ -128,7 +128,9 @@ panic(char *s)
 #define CRTPORT 0x3d4
 #define NEW_LINE '\n'
 #define DOLLAR_SIGN '$'
-#define CONSOLE_LENGHT 80
+#define SPACE ' '
+#define CONSOLE_COLS 80
+#define CONSOLE_ROWS 25
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
 static void
@@ -258,6 +260,19 @@ move_cursor_forward()
   reset_cursor_pos(pos);
 }
 
+static void
+clear_screen()
+{
+    for (int row = 0; row < CONSOLE_ROWS; row++) {
+        for (int col = 0; col < CONSOLE_COLS; col++) {
+            consputc(BACKSPACE);
+        }
+    }
+
+    consputc(DOLLAR_SIGN);
+    consputc(SPACE);
+}
+
 void
 consoleintr(int (*getc)(void))
 {
@@ -288,6 +303,9 @@ consoleintr(int (*getc)(void))
       break;
     case C('F'):
       move_cursor_forward();
+      break;  
+    case C('L'):
+      clear_screen();
       break;  
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
