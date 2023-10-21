@@ -49,7 +49,7 @@ print_group_memebers_name(int group_id, int gropu_members_cnt, ...)
   va_list names;
   va_start(names, gropu_members_cnt);
 
-  printf("Group #%i\n", group_id);
+  printf(WRITE_FD, "Group #%i\n", group_id);
 
   for (int i = 0; i < gropu_members_cnt; i++)
   {
