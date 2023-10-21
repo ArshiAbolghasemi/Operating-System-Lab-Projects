@@ -128,6 +128,7 @@ panic(char *s)
 #define CRTPORT 0x3d4
 #define NEW_LINE '\n'
 #define DOLLAR_SIGN '$'
+#define CONSOLE_LENGHT 80
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
 static void
@@ -219,7 +220,7 @@ reset_cursor_pos(int pos)
 }
 
 static int 
-is_cursor_beggening_of_line(int pos)
+is_cursor_beggening_of_line(int pos)  
 {
   return (
     input.e = input.w ||
@@ -240,6 +241,26 @@ move_cursor_back()
   
   pos--;
   back_counter++;
+  reset_cursor_pos(pos);
+}
+
+static int
+is_cursor_end_of_line(int pos)
+{
+  return (input.e - input.w) == pos % CONSOLE_LENGHT - 2;
+}
+
+static void
+move_cursor_forward()
+{
+  int pos = get_cursor_pos();
+  
+  if (is_cursor_end_of_line(pos))
+  {
+    return;
+  }
+  
+  pos++;
   reset_cursor_pos(pos);
 }
 
@@ -271,6 +292,9 @@ consoleintr(int (*getc)(void))
     case C('B') : 
       move_cursor_back();
       break;
+    case C('F'):
+      move_cursor_forward();
+      break;  
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
         c = (c == '\r') ? '\n' : c;
