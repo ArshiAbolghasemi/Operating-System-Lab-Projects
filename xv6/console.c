@@ -126,6 +126,8 @@ panic(char *s)
 
 #define BACKSPACE 0x100
 #define CRTPORT 0x3d4
+#define NEW_LINE '\n'
+#define DOLLAR_SIGN '$'
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
 static void
@@ -216,10 +218,26 @@ reset_cursor_pos(int pos)
   outb(CRTPORT+1, pos);
 }
 
+static int 
+is_cursor_beggening_of_line(int pos)
+{
+  return (
+    input.e = input.w ||
+    input.buf[(input.e-1) % INPUT_BUF] == NEW_LINE ||
+    crt[pos - 2] == (DOLLAR_SIGN | 0x0700)
+  );
+}
+
 static void
 move_cursor_back()
-{
+{ 
   int pos = get_cursor_pos();
+
+  if (is_cursor_beggening_of_line(pos))
+  {
+    return;
+  }
+  
   pos--;
   back_counter++;
   reset_cursor_pos(pos);
