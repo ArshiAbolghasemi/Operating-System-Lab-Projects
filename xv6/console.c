@@ -244,23 +244,17 @@ move_cursor_back()
   reset_cursor_pos(pos);
 }
 
-static int
-is_cursor_end_of_line(int pos)
-{
-  return (input.e - input.w) == pos % CONSOLE_LENGHT - 2;
-}
-
 static void
 move_cursor_forward()
 {
-  int pos = get_cursor_pos();
-  
-  if (is_cursor_end_of_line(pos))
+  if (back_counter == 0)
   {
     return;
   }
   
+  int pos = get_cursor_pos();
   pos++;
+  back_counter--;
   reset_cursor_pos(pos);
 }
 
