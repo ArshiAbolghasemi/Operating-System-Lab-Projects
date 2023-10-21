@@ -43,6 +43,7 @@
 
 volatile uint *lapic;  // Initialized in mp.c
 
+//PAGEBREAK!
 static void
 lapicw(int index, int value)
 {
