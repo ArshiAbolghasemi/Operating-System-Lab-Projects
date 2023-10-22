@@ -26,6 +26,7 @@ static struct {
   int locking;
 } cons;
 
+
 static void
 printint(int xx, int base, int sign)
 {
@@ -131,6 +132,10 @@ panic(char *s)
 #define SPACE ' '
 #define CONSOLE_COLS 80
 #define CONSOLE_ROWS 25
+#define ARROW_UP 0xE2
+#define ARROW_DOWN 0xE3
+#define BEEP '\a'
+
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
 static void
@@ -198,7 +203,38 @@ struct {
   uint e;  // Edit index
 } input;
 
+#define CMD_STACK_SIZE 10
+struct {
+  char cmd_buf[CMD_STACK_SIZE][INPUT_BUF];
+  uint top;
+  uint last_arrow_used;
+  uint size;
+} cmd_stack;
+
 #define C(x)  ((x)-'@')  // Control-x
+
+static void
+put_on_console(const char* s){
+  for(int i = 0; i < INPUT_BUF && (s[i]); ++i){
+    input.buf[input.e++ % INPUT_BUF] = s[i];
+    consputc(s[i]);
+  }
+}
+
+static void
+backspace()
+{
+  input.e--;
+  consputc(BACKSPACE);
+}
+
+static void
+kill_line(){
+  while(input.e != input.w &&
+        input.buf[(input.e-1) % INPUT_BUF] != '\n'){
+    backspace();
+  }
+}
 
 static int
 get_cursor_pos()
@@ -273,6 +309,39 @@ clear_screen()
     consputc(SPACE);
 }
 
+static void
+push_cmd_stack()
+{
+  if (input.e - input.w == 1) return;
+  
+  cmd_stack.top = (cmd_stack.top + 1) % CMD_STACK_SIZE;
+  memset(cmd_stack.cmd_buf[cmd_stack.top], 0, INPUT_BUF);
+  memmove(cmd_stack.cmd_buf[cmd_stack.top], input.buf + input.w, input.e - input.w - 1);
+  cmd_stack.size++;
+}
+
+static void
+pop_cmd_stack()
+{
+  if (cmd_stack.size == 0 || cmd_stack.top == 0) return;
+
+  kill_line();
+  put_on_console(cmd_stack.cmd_buf[cmd_stack.top]);
+  cmd_stack.last_arrow_used = cmd_stack.top;
+  cmd_stack.top = (cmd_stack.top - 1 + CMD_STACK_SIZE) % CMD_STACK_SIZE;
+}
+
+static void 
+reverse_pop_cmd_stack()
+{
+  if (cmd_stack.size == 0) return;
+  
+  kill_line();
+  put_on_console(cmd_stack.cmd_buf[cmd_stack.last_arrow_used]);
+  cmd_stack.top = cmd_stack.last_arrow_used;
+  cmd_stack.last_arrow_used = (cmd_stack.last_arrow_used + 1) % CMD_STACK_SIZE;
+}
+
 void
 consoleintr(int (*getc)(void))
 {
@@ -286,16 +355,11 @@ consoleintr(int (*getc)(void))
       doprocdump = 1;
       break;
     case C('U'):  // Kill line.
-      while(input.e != input.w &&
-            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
-        input.e--;
-        consputc(BACKSPACE);
-      }
+      kill_line();
       break;
     case C('H'): case '\x7f':  // Backspace
       if(input.e != input.w){
-        input.e--;
-        consputc(BACKSPACE);
+        backspace();
       }
       break;
     case C('B') : 
@@ -307,12 +371,19 @@ consoleintr(int (*getc)(void))
     case C('L'):
       clear_screen();
       break;  
+    case ARROW_UP:
+      pop_cmd_stack();
+      break;
+    case ARROW_DOWN:
+      reverse_pop_cmd_stack();
+      break;  
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
         c = (c == '\r') ? '\n' : c;
         input.buf[input.e++ % INPUT_BUF] = c;
         consputc(c);
         if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
+          push_cmd_stack();
           back_counter = 0;
           input.w = input.e;
           wakeup(&input.r);
