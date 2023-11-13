@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
         exit();
     }
     
-    printf(1, "%d\n", digital_root);
+    printf(WRITE_FD, "%d\n", digital_root);
 
     exit();
 }
