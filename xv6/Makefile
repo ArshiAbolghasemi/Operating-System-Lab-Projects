@@ -185,6 +185,7 @@ UPROGS=\
 	_strdiff\
 	_pid\
 	_find_digital_root_test\
+	_copy_file_test\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

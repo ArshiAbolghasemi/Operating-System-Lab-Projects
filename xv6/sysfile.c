@@ -442,3 +442,87 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+
+int 
+sys_copy_file(void)
+{
+  char* src;
+  char* dist;
+  struct file* src_f;
+  struct file* dist_f;
+  struct inode *src_ip;
+  struct inode *dist_ip;
+
+  if (argstr(0, &src) < 0) {
+    cprintf("failed to get src path!\n");
+    return -1;
+  }
+
+  if (argstr(1, &dist) < 0) {
+    cprintf("failed to get dist path!\n");
+    return -1;
+  }
+
+  if (strncmp(src, dist, strlen(src) > strlen(dist) ? strlen(src) : strlen(dist)) == 0) {
+    cprintf("cant copied file to itself!\n");
+    return -1;
+  }
+
+  begin_op();
+  if((src_ip = create(dist, T_FILE, 0, 0)) < 0) {
+    end_op();
+    cprintf("failed to create ip src!\n");
+    return -1;
+  }
+  if ((src_f = filealloc()) == 0) {
+    iunlockput(src_ip);
+    end_op();
+    cprintf("we are fucked up!\n");
+    return -1;
+  }
+  iunlock(src_ip);
+  end_op();
+
+  src_f->type = FD_INODE;
+  src_f->ip = src_ip;
+  src_f->off = 0;
+  src_f->readable = 1;
+  src_f->writable = 0;
+
+  begin_op();
+  if((dist_ip = create(dist, T_FILE, 0, 0)) < 0) {
+    end_op();
+    cprintf("failed to create ip src!\n");
+    return -1;
+  }
+  if ((dist_f = filealloc()) == 0) {
+    iunlockput(dist_ip);
+    end_op();
+    cprintf("we are fucked up!\n");
+    return -1;
+  }
+  iunlock(dist_ip);
+  end_op();
+
+  dist_f->type = FD_INODE;
+  dist_f->ip = dist_ip;
+  dist_f->off = 0;
+  dist_f->readable = 1;
+  dist_f->writable = 1;
+
+  char buf[256];
+  while (fileread(src_f, buf, sizeof(buf)) > 0) {
+    if(filewrite(dist_f, buf, sizeof(buf)) < 0) {
+      fileclose(src_f);
+      fileclose(dist_f);
+      cprintf("failed to wrrite to file\n");
+      return -1;
+    }
+    memset(buf, 0, 256);
+  }
+
+  fileclose(src_f);
+  fileclose(dist_f);
+
+  return 0;
+}
