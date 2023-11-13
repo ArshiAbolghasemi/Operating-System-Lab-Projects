@@ -532,3 +532,35 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+struct proc*
+get_proc_by_pid(int pid)
+{
+  acquire(&ptable.lock);
+
+  for (struct proc* p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (p->pid != pid) continue;
+
+    release(&ptable.lock);
+    return p;
+  }
+
+  panic("process not fonud!\n");
+}
+
+int
+get_proc_uncle_cnt(int pid)
+{
+  int uncles_cnt = 0;
+  struct proc* process = get_proc_by_pid(pid);
+  
+  acquire(&ptable.lock);
+  for (struct proc* p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if (p->parent->pid != process->parent->parent->pid) continue;
+
+    uncles_cnt++;
+  }
+  release(&ptable.lock);
+
+  return uncles_cnt;
+}

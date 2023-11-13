@@ -56,3 +56,9 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+struct proc*
+get_proc_by_pid(int pid);
+
+int
+get_proc_uncle_cnt(int pid);

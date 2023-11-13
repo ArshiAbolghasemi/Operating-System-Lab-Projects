@@ -89,3 +89,16 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int 
+sys_get_uncle_count(void)
+{
+  int pid;
+
+  if (argint(0, &pid) < 0) {
+    cprintf("failed to get pid!\n");
+    return -1;
+  } 
+
+  return get_proc_uncle_cnt(pid);
+}
