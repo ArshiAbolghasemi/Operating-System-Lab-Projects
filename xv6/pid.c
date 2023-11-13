@@ -1,8 +1,9 @@
 #include "types.h"
 #include "user.h"
+#include "param.h"
 
 int main(int argc, char* argv[])
 {
-    printf(1, "Process ID: %d\n", getpid());
+    printf(WRITE_FD, "Process ID: %d\n", getpid());
     exit();
 }
