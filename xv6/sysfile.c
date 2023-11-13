@@ -481,7 +481,6 @@ sys_copy_file(void)
     return -1;
   }
   iunlock(src_ip);
-  end_op();
 
   src_f->type = FD_INODE;
   src_f->ip = src_ip;
@@ -489,7 +488,6 @@ sys_copy_file(void)
   src_f->readable = 1;
   src_f->writable = 0;
 
-  begin_op();
   if((dist_ip = create(dist, T_FILE, 0, 0)) < 0) {
     end_op();
     cprintf("failed to create ip src!\n");
@@ -502,7 +500,6 @@ sys_copy_file(void)
     return -1;
   }
   iunlock(dist_ip);
-  end_op();
 
   dist_f->type = FD_INODE;
   dist_f->ip = dist_ip;
@@ -515,6 +512,7 @@ sys_copy_file(void)
     if(filewrite(dist_f, buf, sizeof(buf)) < 0) {
       fileclose(src_f);
       fileclose(dist_f);
+      end_op();
       cprintf("failed to wrrite to file\n");
       return -1;
     }
@@ -523,6 +521,7 @@ sys_copy_file(void)
 
   fileclose(src_f);
   fileclose(dist_f);
+  end_op();
 
   return 0;
 }
