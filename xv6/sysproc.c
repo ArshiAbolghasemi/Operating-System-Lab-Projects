@@ -102,3 +102,17 @@ sys_get_uncle_count(void)
 
   return get_proc_uncle_cnt(pid);
 }
+
+int
+sys_get_process_lifetime(void)
+{
+  int pid;
+  struct proc* p;
+  if (argint(0, &pid) < 0) {
+    cprintf("failed to get pid\n");
+    return -1;
+  }
+  
+  p = get_proc_by_pid(pid);
+  return ticks - p->start_time;
+}
