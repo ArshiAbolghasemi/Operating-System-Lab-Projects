@@ -684,3 +684,99 @@ calc_process_bjf_rank(struct proc* p)
 
     return rank;
 }
+
+int
+change_process_queue(int pid,int queue_num)
+{
+  struct proc* p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid)
+      break;
+  }
+  release(&ptable.lock);
+  int old_queue_num = change_queue(p, queue_num);
+  return old_queue_num;
+}
+
+int
+set_bjf_process(int pid, int priority_ratio, int arrival_time_ratio,int executed_cycles_ratio)
+{
+  acquire(&ptable.lock);
+  struct proc* p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      p->scheduling_info.bjf_coeffs.priority_ratio = priority_ratio;
+      p->scheduling_info.bjf_coeffs.arrival_time_ratio =
+      arrival_time_ratio;
+      p->scheduling_info.bjf_coeffs.exec_cycle_ratio =
+      executed_cycles_ratio;
+      release(&ptable.lock);
+      return 0;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+void
+set_bjf_system(int priority_ratio, int arrival_time_ratio, int executed_cycles_ratio)
+{
+  acquire(&ptable.lock);
+  struct proc* p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    p->scheduling_info.bjf_coeffs.priority_ratio = priority_ratio;
+    p->scheduling_info.bjf_coeffs.arrival_time_ratio = arrival_time_ratio;
+    p->scheduling_info.bjf_coeffs.exec_cycle_ratio =
+    executed_cycles_ratio;
+  }
+  release(&ptable.lock);
+}
+
+void
+print_schedule_info(void){
+  static char *states[] = {
+    [UNUSED] "unused",
+    [EMBRYO] "embryo",
+    [SLEEPING] "sleeping",
+    [RUNNABLE] "runnable",
+    [RUNNING] "running",
+    [ZOMBIE] "zombie"
+  };
+  static int columns[] = {16, 8, 9, 8, 8, 8, 8, 9, 8, 8, 8, 8};
+  cprintf("Process_Name PID State Queue  Cycle  Arrival  Priority R_Prty R_Arvl R_Exec R_Size Rank\n"  "------------------------------------------------------------------------------------------------------\n");
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    const char* state;
+    if(p->state == UNUSED)
+      continue;
+    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+      state = states[p->state];
+    else
+      state = "?";
+    cprintf("%s", p->name);
+    printspaces(columns[0] - strlen(p->name));
+    cprintf("%d", p->pid);
+    printspaces(columns[1] - digitcount(p->pid));
+    cprintf("%s", state);
+    printspaces(columns[2] - strlen(state));
+    cprintf("%d", p->scheduling_info.queue);
+    printspaces(columns[3] - digitcount(p->scheduling_info.queue));
+    cprintf("%d", (int)p->scheduling_info.exec_cycle);
+    printspaces(columns[4] - digitcount((int)p->scheduling_info.exec_cycle));
+    cprintf("%d", p->scheduling_info.arrival_time);
+    printspaces(columns[5] - digitcount(p->scheduling_info.arrival_time));
+    cprintf("%d", p->scheduling_info.priority);
+    printspaces(columns[6] - digitcount(p->scheduling_info.priority));
+    cprintf("%d", (int)p->scheduling_info.bjf_coeffs.priority_ratio);
+    printspaces(columns[7] - digitcount((int)p->scheduling_info.bjf_coeffs.priority_ratio));
+    cprintf("%d", (int)p->scheduling_info.bjf_coeffs.arrival_time_ratio);
+    printspaces(columns[8] - digitcount((int)p->scheduling_info.bjf_coeffs.arrival_time_ratio));
+    cprintf("%d", (int)p->scheduling_info.bjf_coeffs.exec_cycle_ratio);
+    printspaces(columns[9] - digitcount((int)p->scheduling_info.bjf_coeffs.exec_cycle_ratio));
+    cprintf("%d", (int)p->scheduling_info.bjf_coeffs.process_size_ratio);
+    printspaces(columns[10] - digitcount((int)p->scheduling_info.bjf_coeffs.process_size_ratio));
+    cprintf("%d", (int)calc_process_bjf_rank(p));
+    cprintf("\n");
+  }
+}

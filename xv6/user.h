@@ -27,6 +27,10 @@ int find_digital_root(void);
 int copy_file(char*, char*);
 int get_uncle_count(int);
 int get_process_lifetime(int);
+int change_process_queue(int);
+int set_bjf_process(int, int,int, int);
+int set_bjf_system(int,int,int);
+int print_info(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
