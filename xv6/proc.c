@@ -111,6 +111,13 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  memset(&p->scheduling_info, 0, sizeof(p->scheduling_info));
+  p->scheduling_info.queue = UNSET;
+  p->scheduling_info.priority = 3;
+  p->scheduling_info.bjf_coeffs.priority_ratio = 1;
+  p->scheduling_info.bjf_coeffs.arrival_time_ratio = 1;
+  p->scheduling_info.bjf_coeffs.exec_cycle_ratio = 1;
+
   return p;
 }
 
@@ -216,7 +223,14 @@ fork(void)
 
   np->state = RUNNABLE;
 
+  acquire(&tickslock);
+  np->scheduling_info.last_run = ticks;
+  np->scheduling_info.arrival_time = ticks;
+  release(&tickslock);
+
   release(&ptable.lock);
+
+  change_queue(np->pid, UNSET);
 
   return pid;
 }
@@ -324,6 +338,7 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  struct proc *last_round_robin = &ptable.proc[NPROC - 1];
   c->proc = 0;
   
   for(;;){
@@ -332,6 +347,21 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+    p = find_next_round_robin(last_round_robin);
+    if(p)
+      last_round_robin = p;
+    else{
+      p = find_next_lcfs();
+      if(!p){
+        p = find_next_bjf();
+        if(!p){
+          release(&ptable.lock);
+          continue;
+        }
+      }
+    }
+
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
@@ -342,6 +372,9 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
+
+      p->scheduling_info.last_run = ticks;
+      p->scheduling_info.exec_cycle += 0.1f;
 
       swtch(&(c->scheduler), p->context);
       switchkvm();
@@ -563,4 +596,91 @@ get_proc_uncle_cnt(int pid)
   release(&ptable.lock);
 
   return uncles_cnt;
+}
+
+void
+handle_aging(int ticks)
+{
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if ((p->state != RUNNABLE)||(p->scheduling_info.queue == ROUND_ROBIN))
+      continue;
+    if (ticks - p->scheduling_info.last_run > AGING_THRESHOLD){
+      release(&ptable.lock);
+      change_queue(p->pid, ROUND_ROBIN);
+      acquire(&ptable.lock);
+    }
+  }
+  release(&ptable.lock);
+}
+
+
+struct proc*
+find_next_round_robin(struct proc* last_scheduled)
+{
+  struct proc *p = last_scheduled;
+  do{
+    p++;
+
+    if (p == &ptable.proc[NPROC])
+      p = ptable.proc;
+    
+    if (p->state == RUNNABLE && p->scheduling_info.queue == ROUND_ROBIN)
+      return p;
+
+  }while(p != last_scheduled);
+  return 0;
+}
+
+struct proc*
+find_next_lcfs()
+{
+  struct proc *last_process = 0;
+  struct proc *p;
+  int max_start_time = -1;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+
+    if((p->state != RUNNABLE)||(p->scheduling_info.queue != LCFS))
+      continue;
+    
+    if (p->scheduling_info.arrival_time > max_start_time){
+    max_start_time = p->start_time;
+    last_process = p;
+    }
+  }
+
+  return last_process;
+}
+
+struct proc*
+find_next_bjf()
+{
+  struct proc *p;
+  struct proc *bj_process = 0;
+  float bj_rank;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    float current_job_rank = calc_process_bjf_rank(p);
+    if(p->state != RUNNABLE || p->scheduling_info.queue != BJF)
+      continue;
+    if((bj_process == 0)||(current_job_rank < bj_rank)){
+      bj_rank = current_job_rank;
+      bj_process = p;
+    }
+  }
+  return bj_process;
+}
+
+float
+calc_process_bjf_rank(struct proc* p)
+{
+    float rank = 0.0;
+
+    rank += p->scheduling_info.arrival_time * p->scheduling_info.bjf_coeffs.arrival_time_ratio;
+    rank += p->scheduling_info.exec_cycle * p->scheduling_info.bjf_coeffs.exec_cycle_ratio;
+    rank += p->scheduling_info.priority * p->scheduling_info.bjf_coeffs.priority_ratio;
+    rank += p->sz * p->scheduling_info.bjf_coeffs.process_size_ratio;
+
+    return rank;
 }

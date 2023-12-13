@@ -1,3 +1,5 @@
+#define AGING_THRESHOLD 8000
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -50,6 +52,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   uint start_time;
+  struct scheduling scheduling_info;
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -58,8 +61,48 @@ struct proc {
 //   fixed-size stack
 //   expandable heap
 
+enum scheduling_queue{
+  UNSET,
+  ROUND_ROBIN,
+  LCFS,
+  BJF
+};
+
+struct bjf{
+  int priority_ratio;
+  float arrival_time_ratio;
+  float process_size_ratio;
+  float exec_cycle_ratio;
+};
+
+struct scheduling{
+  int priority;
+  int arrival_time;
+  int last_run;
+  float exec_cycle;
+  enum scheduling_queue queue;
+  struct bjf bjf_coeffs;
+
+};
+
+
 struct proc*
 get_proc_by_pid(int pid);
 
 int
 get_proc_uncle_cnt(int pid);
+
+void
+handle_aging(int tick);
+
+struct proc*
+find_next_round_robin(struct proc* last_scheduled);
+
+struct proc*
+find_next_lcfs();
+
+struct proc*
+find_next_bjf();
+
+float
+calc_process_bjf_rank(struct proc* p);
