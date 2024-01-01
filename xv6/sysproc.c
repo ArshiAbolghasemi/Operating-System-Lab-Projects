@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "prioritylock.h"
 
 int
 sys_fork(void)
@@ -161,4 +162,67 @@ sys_print_info(void)
   return 0;
 }
 
+int
+sys_initpriority(void)
+{
+  char *name = "test";
+  init_prioritylock(&prioritylock, name);
 
+  return 0;
+}
+
+int
+sys_testpriority(void)
+{
+  acquire_priority(&prioritylock);
+  int z = 1;
+  for(int j = 0; j < 20000; j+=1){
+    z += (j + 1);
+    cprintf ("");  
+  }
+  show_acquiring_info(&prioritylock);
+  release_priority(&prioritylock);
+
+  return 0;
+}
+
+int 
+sys_resetsyscallnum(void)
+{
+  for (int i = 0; i < NCPU; ++i)
+  {
+    pushcli();
+    cpus[i].syscallcounter = 0;
+    __sync_synchronize();
+    popcli();
+  }
+
+  pushcli();
+  syscallcounter = 0;
+  __sync_synchronize();
+  popcli();
+
+  return 0;
+}
+
+int
+sys_getsyscallnum(void)
+{
+  int total = 0;
+  int count = 0;
+  cprintf("Shared system call counter value: %d\n", syscallcounter);
+
+  for (int i = 0; i < NCPU; ++i)
+  {
+    pushcli();
+    count = cpus[i].syscallcounter;
+    popcli();
+
+    total += count;
+    cprintf("CPU %d system call counter value: %d\n", i, count);
+  }
+
+  cprintf("Sum of Per-cpu system call counters value: %d\n", total);
+
+  return 0;
+}

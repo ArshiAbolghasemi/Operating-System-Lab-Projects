@@ -28,3 +28,9 @@
 #define SYS_set_bjf_process 27
 #define SYS_set_bjf_system 28
 #define SYS_print_info 29
+//lab4
+#define SYS_initpriority 	30
+#define SYS_testpriority 	31
+#define SYS_getsyscallnum 	32
+#define SYS_resetsyscallnum 33
+

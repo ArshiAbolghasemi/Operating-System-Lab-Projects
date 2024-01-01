@@ -32,6 +32,11 @@ int set_bjf_process(int, int,int, int);
 int set_bjf_system(int,int,int);
 int print_info(void);
 
+int initpriority(void);
+int testpriority(void);
+int getsyscallnum(void);
+int resetsyscallnum(void);
+
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);

@@ -111,6 +111,10 @@ extern int sys_change_process_queue(void);
 extern int sys_set_bjf_process(void);
 extern int sys_set_bjf_system(void);
 extern int sys_print_info(void);
+extern int sys_initpriority(void);
+extern int sys_testpriority(void);
+extern int sys_getsyscallnum(void);
+extern int sys_resetsyscallnum(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -142,13 +146,38 @@ static int (*syscalls[])(void) = {
 [SYS_set_bjf_process] sys_set_bjf_process,
 [SYS_set_bjf_system] sys_set_bjf_system,
 [SYS_print_info] sys_print_info,
+[SYS_initpriority]    sys_initpriority,
+[SYS_testpriority]    sys_testpriority,
+[SYS_getsyscallnum]   sys_getsyscallnum,
+[SYS_resetsyscallnum] sys_resetsyscallnum,
 };
+
+void 
+update_shared_syscallcounter(void)
+{
+  pushcli();
+  syscallcounter++;
+  __sync_synchronize();
+  popcli();
+}
+
+void 
+update_per_cpu_syscallcounter(void)
+{
+  pushcli();
+  mycpu()->syscallcounter++;
+  __sync_synchronize();
+  popcli();
+}
 
 void
 syscall(void)
 {
   int num;
   struct proc *curproc = myproc();
+
+  update_shared_syscallcounter();
+  update_per_cpu_syscallcounter();
 
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {

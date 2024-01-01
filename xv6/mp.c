@@ -12,6 +12,7 @@
 #include "proc.h"
 
 struct cpu cpus[NCPU];
+int syscallcounter = 0;
 int ncpu;
 uchar ioapicid;
 
